@@ -119,7 +119,33 @@ jobs:
           console.log(`Imported ${imported} simulation receipts.`);
           JS
       - id: verify-tasks
-        run: node vibestack/spec.ts tasks build typecheck test test:browser check //#lint:js //#lint:css //#analyze --filter='!@elizaos/*' --continue=dependencies-successful --summarize --log-order=stream
+        run: node vibestack/spec.ts tasks build typecheck test test:browser //#lint:js //#lint:css //#analyze --filter='!@elizaos/*' --continue=dependencies-successful --summarize --log-order=stream
+      - name: Confirm the exact review candidate passed every proof
+        run: |
+          report="$RUNNER_TEMP/feed-spec-review.ndjson"
+          status=0
+          pnpm --silent check --json > "$report" || status=$?
+          node --input-type=module - "$report" "$status" <<'JS'
+          import fs from "node:fs";
+          const [report, status] = process.argv.slice(2);
+          const lines = fs.readFileSync(report, "utf8").trim().split("\n");
+          const summary = JSON.parse(lines.at(-1));
+          const failed = summary.results.filter((result) => !result.ok);
+          for (const { stage, summary } of failed) console.log(`${stage}: ${summary}`);
+          if ((status !== "0" && status !== "1") ||
+              !summary.results.some((result) => result.stage === "proof" && result.ok) ||
+              failed.some((result) => result.stage !== "review" || /story has no rules|not formalized/.test(result.detail))) {
+            throw new Error("Spec checks must pass before recording the review");
+          }
+          JS
+      - name: Record the user-approved spec review
+        run: pnpm accept
+      - uses: actions/upload-artifact@v7
+        with:
+          name: feed-spec-review-ledger
+          path: spec/lock.json
+          if-no-files-found: error
+          retention-days: 3
       - name: Verify Cloudflare Worker dry-run bundle
         run: pnpm --filter @repo/app exec wrangler deploy --config wrangler.production.jsonc --dry-run
       - if: always() && steps.setup.outputs.spec-cache-key != ''
