@@ -244,6 +244,8 @@ pure def report(s: ModerationState, targetKind: ReportTargetKind, targetUserId: 
 
 ### Creating notifications skips blocked actors and increments unread count
 
+Chat message notifications use the same creation rules as other interactions.
+
 Only `"system"` dispatches `createNotification`. Social and invite notifications require a non-blocked actor distinct from the recipient; market and P&L notifications are system-sourced (`actorId == ""`).
 
 ```quint

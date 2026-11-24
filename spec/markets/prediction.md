@@ -245,7 +245,9 @@ pure def openMarket(m: PredictionMarket, slot: MarketSlot, secretOutcome: Secret
 
 ### Buying YES or NO shares requires an open non-expired market, sufficient balance, and bounded odds impact
 
-The canonical `10 bps` fee is computed on the gross input (`amountCents`), recorded in `feeLedgerCents`, and the remaining `netCents` mints complete sets and swaps along the CPMM curve. Post-trade odds must remain within `[200, 9800]` bps, except when an already-extreme pool (`< 200` or `> 9800` bps) unwinds strictly toward `5000` bps without flipping past the opposite bound, and single-trade odds movement cannot exceed `MAX_ODDS_MOVE_BPS`.
+The canonical `10 bps` fee is computed on the gross input (`amountCents`), recorded in `feeLedgerCents`, and the remaining `netCents` mints complete sets and swaps along the CPMM curve. Post-trade odds must land within `[200, 9800]` bps or, for a pool already
+outside the band, move strictly closer to it on the same side. Single-trade
+odds movement cannot exceed `MAX_ODDS_MOVE_BPS`.
 
 ```quint
 pure def canBuy(m: PredictionMarket, traderId: str, side: Side, amountCents: Cents): bool =
@@ -304,7 +306,8 @@ pure val eval_refuse_canBuy = { traderId: "alice", side: Yes, amountCents: -1 }
 
 ### Selling shares floors gross proceeds to whole cents before charging the canonical fee
 
-Sub-cent remainders stay in house liquidity; if settled proceeds are `1 cent`, the `1 cent` round-up fee yields `0` net credit. A sell quote is refused when its resulting reserves fall below the market’s constant-product floor. Sells enforce the same `[200, 9800]` bps bounds (allowing extreme unwind toward `5000` bps without cross-center flips) and cap single-trade movement at `MAX_ODDS_MOVE_BPS` except on full-position exits (`sellShares == held`).
+Sub-cent remainders stay in house liquidity; if settled proceeds are `1 cent`, the `1 cent` round-up fee yields `0` net credit. A sell quote is refused when its resulting reserves fall below the market’s constant-product floor. Sells use the same odds band and unwind rule as buys. A full-position exit
+(`sellShares == held`) may exceed `MAX_ODDS_MOVE_BPS`.
 
 ```quint
 pure def canSell(m: PredictionMarket, traderId: str, side: Side, sellShares: int): bool =
